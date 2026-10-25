@@ -196,12 +196,34 @@ This will:
 
 After setup, the MCP server will use the saved tokens automatically — no MFA prompt needed until the tokens expire. When they do, simply run the setup command again.
 
+## Homelab container and Streamable HTTP
+
+This fork adds a hardened container entry point at `/mcp` using MCP Streamable HTTP. It requires a bearer token (`MCP_AUTH_TOKEN`, at least 32 characters) in addition to the Garmin credentials; unauthenticated requests receive `401`. `/healthz` exposes only a basic health status. The container listens on port `3000` and stores Garmin OAuth tokens under `$HOME/.garmin-mcp`; mount a private writable volume there if tokens should survive pod restarts.
+
+Build and run locally:
+
+```bash
+npm ci
+npm test
+GARMIN_EMAIL='you@email.com' GARMIN_PASSWORD='yourpass' \\
+  MCP_AUTH_TOKEN='replace-with-a-random-token-of-at-least-32-characters' \\
+  npm run start:http
+```
+
+Container build:
+
+```bash
+docker build -t garmin-connect-mcp:local .
+```
+
+Configure `MCP_ALLOWED_HOSTS` as a comma-separated list of exact Host header values when binding beyond localhost. Do not publish this service without network restrictions and a strong bearer token. Garmin credentials and the bearer token belong in a secret manager, never in an image layer or ConfigMap.
+
 ## Development
 
 ```bash
-git clone https://github.com/Nicolasvegam/garmin-connect-mcp.git
+git clone https://github.com/spagno-lab/garmin-connect-mcp.git
 cd garmin-connect-mcp
-npm install
+npm ci
 npm run build
 ```
 
