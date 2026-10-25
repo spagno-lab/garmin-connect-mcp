@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const token = 'test-token-for-http-mcp-authorization-1234567890';
 let child;
 let port;
 let baseUrl;
@@ -31,7 +30,6 @@ before(async () => {
       ...process.env,
       GARMIN_EMAIL: 'test@example.invalid',
       GARMIN_PASSWORD: 'test-only-password',
-      MCP_AUTH_TOKEN: token,
       MCP_HTTP_HOST: '127.0.0.1',
       MCP_HTTP_PORT: String(port),
     },
@@ -66,18 +64,8 @@ test('health check does not expose MCP data', async () => {
   assert.deepEqual(await response.json(), { status: 'ok' });
 });
 
-test('MCP endpoint rejects requests without bearer authentication', async () => {
-  const response = await fetch(`${baseUrl}/mcp`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
-  });
-  assert.equal(response.status, 401);
-});
-
-test('authorized client can initialize and list tools over Streamable HTTP', async () => {
+test('client can initialize and list tools over Streamable HTTP without application credentials', async () => {
   const headers = {
-    authorization: `Bearer ${token}`,
     'content-type': 'application/json',
     accept: 'application/json, text/event-stream',
   };

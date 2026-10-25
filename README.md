@@ -198,7 +198,7 @@ After setup, the MCP server will use the saved tokens automatically — no MFA p
 
 ## Homelab container and Streamable HTTP
 
-This fork adds a hardened container entry point at `/mcp` using MCP Streamable HTTP. It requires a bearer token (`MCP_AUTH_TOKEN`, at least 32 characters) in addition to the Garmin credentials; unauthenticated requests receive `401`. `/healthz` exposes only a basic health status. The container listens on port `3000` and stores Garmin OAuth tokens under `$HOME/.garmin-mcp`; mount a private writable volume there if tokens should survive pod restarts.
+This fork adds a hardened container entry point at `/mcp` using MCP Streamable HTTP. It does not require application-level credentials: only the server needs Garmin credentials, which should be injected from a secret manager. `/healthz` exposes only a basic health status. The container listens on port `3000` and stores Garmin OAuth tokens under `$HOME/.garmin-mcp`; mount a private writable volume there if tokens should survive pod restarts. Because MCP requests can read sensitive health and fitness data, restrict network ingress to trusted clients (for example with a Kubernetes NetworkPolicy); do not expose this unauthenticated endpoint to untrusted networks or the public internet.
 
 Build and run locally:
 
@@ -216,7 +216,7 @@ Container build:
 docker build -t garmin-connect-mcp:local .
 ```
 
-Configure `MCP_ALLOWED_HOSTS` as a comma-separated list of exact Host header values when binding beyond localhost. Do not publish this service without network restrictions and a strong bearer token. Garmin credentials and the bearer token belong in a secret manager, never in an image layer or ConfigMap.
+Configure `MCP_ALLOWED_HOSTS` as a comma-separated list of exact Host header values when binding beyond localhost. This HTTP transport has no application-level authentication, so enforce access with network controls and never publish it to untrusted networks or the public internet. Garmin credentials belong in a secret manager, never in an image layer or ConfigMap.
 
 ## Development
 
