@@ -1,19 +1,14 @@
-import { timingSafeEqual, randomUUID } from 'node:crypto';
-import type { Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createMcpServer } from './server';
 
 const host = process.env.MCP_HTTP_HOST ?? '0.0.0.0';
 const port = Number(process.env.MCP_HTTP_PORT ?? 3000);
-const authToken = process.env.MCP_AUTH_TOKEN;
 const allowedHosts = process.env.MCP_ALLOWED_HOSTS?.split(',').map((value) => value.trim()).filter(Boolean);
 
 if (!process.env.GARMIN_EMAIL || !process.env.GARMIN_PASSWORD) {
   throw new Error('GARMIN_EMAIL and GARMIN_PASSWORD are required');
-}
-if (!authToken || authToken.length < 32) {
-  throw new Error('MCP_AUTH_TOKEN is required and must be at least 32 characters');
 }
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error('MCP_HTTP_PORT must be a valid TCP port');
@@ -35,22 +30,6 @@ const sessionReaper = setInterval(() => {
 }, 60_000);
 sessionReaper.unref();
 
-function hasValidBearerToken(header: string | undefined): boolean {
-  if (!header?.startsWith('Bearer ')) return false;
-  const supplied = Buffer.from(header.slice('Bearer '.length));
-  const expected = Buffer.from(authToken);
-  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
-}
-
-function authorize(req: Request, res: Response, next: () => void): void {
-  if (!hasValidBearerToken(req.header('authorization'))) {
-    res.setHeader('WWW-Authenticate', 'Bearer');
-    res.status(401).json({ error: 'unauthorized' });
-    return;
-  }
-  next();
-}
-
 function getSession(req: Request, res: Response): McpSession | undefined {
   const id = req.header('mcp-session-id');
   if (!id) {
@@ -65,8 +44,6 @@ function getSession(req: Request, res: Response): McpSession | undefined {
 const app = createMcpExpressApp({ host, allowedHosts });
 app.disable('x-powered-by');
 app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok' }));
-app.use('/mcp', authorize);
-
 app.post('/mcp', async (req, res) => {
   const sessionId = req.header('mcp-session-id');
   let session = sessionId ? sessions.get(sessionId) : undefined;
@@ -124,12 +101,12 @@ app.post('/mcp', async (req, res) => {
   }
 });
 
-app.get('/mcp', authorize, async (req, res) => {
+app.get('/mcp', async (req, res) => {
   const session = getSession(req, res);
   if (session) await session.transport.handleRequest(req, res);
 });
 
-app.delete('/mcp', authorize, async (req, res) => {
+app.delete('/mcp', async (req, res) => {
   const session = getSession(req, res);
   if (session) await session.transport.handleRequest(req, res);
 });
